@@ -7,11 +7,10 @@ using Calculatrice.Infrastructure.Strategies;
 
 public static class Program
 {
-    public static void Main(string[] args)
+    public static void Main()
     {
-        Equation equation = new Equation();
-
-        IStrategieOperation[] operateurs =
+        var equation = new Equation();
+        var operateurs = new IStrategieOperation[]
         {
             new Addition(),
             new Soustraction(),
@@ -20,46 +19,37 @@ public static class Program
             new Puissance()
         };
 
-        DivisionParZeroPolicy divisionPolicy = new DivisionParZeroPolicy();
-        IPolicy[] policies = { divisionPolicy };
+        var policies = new IPolicy[] { new DivisionParZeroPolicy() };
 
-        ICalculerEquation evaluateur = new CalculerEquation(equation, operateurs, policies);
-        CalculerExpression calculer = new CalculerExpression(evaluateur);
+        var evaluateur = new CalculerEquation(equation, operateurs, policies);
+        var calculer = new CalculerExpression(evaluateur);
 
         Console.WriteLine(" -> Calculatrice EZO Test By Jeanpy Mukuna\n");
-        Console.WriteLine("Entrez votre calcul et appuyez sur Entrée pour voir les résultats.");
-        Console.WriteLine("Tapez 'exit' pour quitter.\n");
+        Console.WriteLine("Entrez votre calcul et appuyez sur Entrée.");
+        Console.WriteLine("Tapez 'exit' ou 'q' pour quitter.\n");
 
         while (true)
         {
             Console.Write("> ");
-            string? entree = Console.ReadLine();
+            var entree = Console.ReadLine();
 
             if (string.IsNullOrWhiteSpace(entree))
             {
-                Console.WriteLine("Expression vide, veuillez entrer un calcul.\n");
+                Console.WriteLine("Expression vide.\n");
                 continue;
             }
 
-            if (entree.Equals("Q", StringComparison.OrdinalIgnoreCase))
+            if (entree.Equals("exit", StringComparison.OrdinalIgnoreCase) ||
+                entree.Equals("q", StringComparison.OrdinalIgnoreCase))
                 break;
 
             try
             {
-                decimal resultat = calculer.Executer(entree);
-                Console.WriteLine($"= {resultat}\n");
-            }
-            catch (DivideByZeroException ex)
-            {
-                Console.WriteLine($"Erreur: {ex.Message}\n");
-            }
-            catch (ArgumentException ex)
-            {
-                Console.WriteLine($"Erreur: {ex.Message}\n");
+                Console.WriteLine($"= {calculer.Executer(entree)}\n");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur inattendue: {ex.Message}\n");
+                Console.WriteLine($"Erreur: {ex.Message}\n");
             }
         }
     }
