@@ -10,17 +10,17 @@ public enum TypeEntree
 public class Entree
 {
     public TypeEntree Type { get; }
-    public string Caractere { get; }
+    public string Chaine { get; }
     public decimal? Valeur { get; }
 
-    public Entree(TypeEntree type, string caractere, decimal? valeur = null)
+    public Entree(TypeEntree type, string chaine, decimal? valeur = null)
     {
         Type = type;
-        Caractere = caractere;
+        Chaine = chaine;
         Valeur = valeur;
     }
     public override string ToString()
     {
-        return Valeur is null ? $"{Type}:{Caractere}" : $"{Type}:{Valeur}";
+        return Valeur is null ? $"{Type}:{Chaine}" : $"{Type}:{Valeur}";
     }
 }

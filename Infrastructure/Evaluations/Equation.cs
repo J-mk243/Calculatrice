@@ -1,98 +1,119 @@
 ﻿using System.Globalization;
 
 namespace Calculatrice.Infrastructure.Evaluation;
-public sealed class Equation
+
+public class Equation
 {
-    public IReadOnlyList<Entree> Recuperer(string expression)
+    private const string OperateursSupportes = "+-*/^";
+
+    /// <summary>
+    /// Transforme une expression mathématique en une liste d'entrées (tokens).
+    /// </summary>
+    public IReadOnlyList<Entree> ExtraireEntrees(string expression)
     {
-        var elements = new List<Entree>();
-        string e = expression.Trim();
-        int i = 0;
+        var entrees = new List<Entree>();
+        string expr = expression.Trim();
 
-        while (i < e.Length)
+        for (int index = 0; index < expr.Length; index++)
         {
-            char c = e[i];
+            char courant = expr[index];
 
-            if (char.IsWhiteSpace(c)) { i++; continue; }
+            if (char.IsWhiteSpace(courant)) continue;
 
-            if (c == '(') { elements.Add(new Entree(TypeEntree.ParentheseGauche, "(")); i++; continue; }
-            if (c == ')') { elements.Add(new Entree(TypeEntree.ParentheseDroite, ")")); i++; continue; }
+            if (courant == '(') { entrees.Add(new Entree(TypeEntree.ParentheseGauche, "(")); continue; }
+            if (courant == ')') { entrees.Add(new Entree(TypeEntree.ParentheseDroite, ")")); continue; }
 
-            if ("+-*/^".Contains(c))
+            if (OperateursSupportes.Contains(courant))
             {
-                if (EstMoinsUnaire(c, elements))
+                if (EstUnMoinsUnaire(courant, entrees))
                 {
-                    i++;
-                    while (i < e.Length && char.IsWhiteSpace(e[i])) i++;
+                    index++;
+                    while (index < expr.Length && char.IsWhiteSpace(expr[index])) index++;
 
-                    decimal? nombreNegatif = LireNombre(e, ref i);
+                    var (nombreNegatif, nouvelIndex) = LireNombre(expr, index);
+                    index = nouvelIndex - 1;
+
                     if (nombreNegatif is null)
-                        throw new ArgumentException("Nombre négatif mal formé après '-'.");
+                        throw new ArgumentException("Un nombre négatif est mal formé.");
 
                     decimal valeur = -nombreNegatif.Value;
-                    elements.Add(new Entree(TypeEntree.Nombre, valeur.ToString(CultureInfo.InvariantCulture), valeur));
+                    entrees.Add(new Entree(TypeEntree.Nombre, valeur.ToString(CultureInfo.InvariantCulture), valeur));
                     continue;
                 }
 
-                elements.Add(new Entree(TypeEntree.Operateur, c.ToString()));
-                i++;
+                entrees.Add(new Entree(TypeEntree.Operateur, courant.ToString()));
                 continue;
             }
 
-            if (char.IsDigit(c) || c == '.')
+            if (char.IsDigit(courant) || courant == '.')
             {
-                decimal? nombre = LireNombre(e, ref i);
+                var (nombre, nouvelIndex) = LireNombre(expr, index);
+                index = nouvelIndex - 1;
+
                 if (nombre is null) throw new ArgumentException("Nombre mal formé.");
-                elements.Add(new Entree(TypeEntree.Nombre, nombre.Value.ToString(CultureInfo.InvariantCulture), nombre));
+                entrees.Add(new Entree(TypeEntree.Nombre, nombre.Value.ToString(CultureInfo.InvariantCulture), nombre));
                 continue;
             }
 
-            if (char.IsLetter(c))
+            if (char.IsLetter(courant))
             {
-                string ident = LireIdentifiant(e, ref i);
-                elements.Add(new Entree(TypeEntree.Fonction, ident));
+                var (identifiant, nouvelIndex) = LireIdentifiant(expr, index);
+                index = nouvelIndex - 1;
+
+                entrees.Add(new Entree(TypeEntree.Fonction, identifiant));
                 continue;
             }
 
-            throw new ArgumentException($"Caractère invalide: '{c}'.");
+            throw new ArgumentException($"Caractère invalide: '{courant}'.");
         }
 
-        return elements;
+        return entrees;
     }
 
-    private static bool EstMoinsUnaire(char c, List<Entree> elements)
+    /// <summary>
+    /// Vérifie si le caractère '-' doit être interprété comme un signe négatif (unaire).
+    /// </summary>
+    private static bool EstUnMoinsUnaire(char c, List<Entree> entrees)
     {
         return c == '-' &&
-               (elements.Count == 0 ||
-                elements[^1].Type == TypeEntree.Operateur ||
-                elements[^1].Type == TypeEntree.ParentheseGauche ||
-                elements[^1].Type == TypeEntree.Fonction);
+               (entrees.Count == 0 ||
+                entrees[^1].Type == TypeEntree.Operateur ||
+                entrees[^1].Type == TypeEntree.ParentheseGauche ||
+                entrees[^1].Type == TypeEntree.Fonction);
     }
 
-    private static decimal? LireNombre(string s, ref int i)
+    /// <summary>
+    /// Lit un nombre (entier ou décimal) et retourne sa valeur et la nouvelle position.
+    /// </summary>
+    private static (decimal? valeur, int nouvelIndex) LireNombre(string s, int index)
     {
-        int start = i;
+        int debut = index;
         bool pointVu = false;
 
-        while (i < s.Length)
+        while (index < s.Length)
         {
-            char c = s[i];
-            if (char.IsDigit(c)) { i++; continue; }
-            if (c == '.' && !pointVu) { pointVu = true; i++; continue; }
+            char c = s[index];
+            if (char.IsDigit(c)) { index++; continue; }
+            if (c == '.' && !pointVu) { pointVu = true; index++; continue; }
             break;
         }
 
-        ReadOnlySpan<char> span = s.AsSpan(start, i - start);
-        if (span.Length == 0) return null;
+        ReadOnlySpan<char> span = s.AsSpan(debut, index - debut);
+        if (span.Length == 0) return (null, index);
 
-        return decimal.TryParse(span, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal val)
-            ? val
-            : null;
+        return decimal.TryParse(span, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal valeur)
+            ? (valeur, index)
+            : (null, index);
     }
-    private static string LireIdentifiant(string s, ref int i)
+
+    /// <summary>
+    /// Lit un identifiant de fonction (ex: sqrt) et retourne son nom et la nouvelle position.
+    /// </summary>
+    private static (string identifiant, int nouvelIndex) LireIdentifiant(string s, int index)
     {
-        int start = i;
-        while (i < s.Length && char.IsLetter(s[i])) i++;
-        return s.Substring(start, i - start).ToLowerInvariant();
+        int debut = index;
+        while (index < s.Length && char.IsLetter(s[index])) index++;
+        string identifiant = s.Substring(debut, index - debut).ToLowerInvariant();
+        return (identifiant, index);
     }
 }
